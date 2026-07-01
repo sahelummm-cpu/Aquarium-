@@ -119,8 +119,18 @@ function seedTank() {
   };
 }
 
+// Honor `?tab=` deep links so PWA home-screen shortcuts (Log / Tasks /
+// Gallery) open straight to the right screen.
+const VALID_TABS = ["home", "calendar", "graphs", "gallery", "tools", "community", "settings"];
+function initialTab() {
+  try {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t && VALID_TABS.includes(t) ? t : "home";
+  } catch { return "home"; }
+}
+
 export default function Reeflog() {
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState(initialTab);
   const [tanks, setTanks] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [premium, setPremium] = useState(false);
@@ -283,6 +293,72 @@ function Header({ active, tanks, setActiveId, addTank, premium, onCrown, onSetti
 }
 
 /* ================= HOME ================= */
+/* Glanceable widget — mirrors what a home / lock-screen widget shows.
+   On installed PWAs this is the at-a-glance card users see first;
+   its data (health, next task, latest params) is exactly what the
+   OS widget / lock-screen complication would surface. */
+function GlanceWidget({ tank }) {
+  const health = healthScore(tank);
+  const upcoming = [...tank.tasks].filter((t) => !t.done)
+    .sort((a, b) => new Date(a.next) - new Date(b.next))[0];
+  const nextIn = upcoming ? daysBetween(todayKey(), upcoming.next) : null;
+  const latest = (id) => {
+    const a = tank.measures?.[id];
+    return a && a.length ? a[a.length - 1].v : null;
+  };
+  const temp = latest("temp");
+  const ph = latest("ph");
+  const dueLabel =
+    nextIn == null ? "All clear" : nextIn <= 0 ? "Due now" : nextIn === 1 ? "in 1 day" : `in ${nextIn} days`;
+
+  return (
+    <div style={{
+      position: "relative", borderRadius: 22, padding: 16, marginTop: 4, marginBottom: 4,
+      background: `linear-gradient(150deg, rgba(63,224,208,0.14), rgba(6,19,25,0.6) 60%), ${T.cardSolid}`,
+      border: `1px solid ${T.line}`, overflow: "hidden",
+      boxShadow: `0 8px 30px rgba(0,0,0,0.35), inset 0 0 40px rgba(63,224,208,0.05)`,
+    }}>
+      <div style={{ position: "absolute", top: -30, right: -20, width: 130, height: 130, borderRadius: "50%",
+        background: `radial-gradient(circle, ${T.cyan}22, transparent 70%)` }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 8, display: "grid", placeItems: "center",
+            background: `linear-gradient(135deg, ${T.cyan}, ${T.cyanDim})` }}>
+            <Waves size={14} color="#04222a" strokeWidth={2.4} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{tank.name}</div>
+        </div>
+        <div style={{ fontSize: 9.5, letterSpacing: 0.6, color: T.sub, fontFamily: MONO,
+          border: `1px solid ${T.line}`, padding: "2px 7px", borderRadius: 7 }}>WIDGET</div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginTop: 12 }}>
+        <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1,
+          color: health.score >= 80 ? T.good : health.score >= 55 ? T.gold : T.danger }}>{health.score}</div>
+        <div style={{ fontSize: 12, color: T.sub, marginBottom: 4 }}>health</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 12 }}>
+        <WChip icon={<Timer size={13} />} label="Next task" value={dueLabel}
+          tint={nextIn != null && nextIn <= 0 ? T.coral : T.cyan} />
+        <WChip icon={<Thermometer size={13} />} label="Temp" value={temp != null ? `${temp}°` : "—"} tint={T.coral} />
+        <WChip icon={<FlaskConical size={13} />} label="pH" value={ph != null ? `${ph}` : "—"} tint={T.cyan} />
+      </div>
+    </div>
+  );
+}
+
+function WChip({ icon, label, value, tint }) {
+  return (
+    <div style={{ background: "rgba(6,19,25,0.45)", border: `1px solid ${T.line}`, borderRadius: 13, padding: "9px 10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, color: tint }}>{icon}
+        <span style={{ fontSize: 9.5, color: T.sub, letterSpacing: 0.3 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{value}</div>
+    </div>
+  );
+}
+
 function HomeTab({ tank, updateTank, showAds, onUpgrade, premium, setShowPaywall }) {
   const [quickNote, setQuickNote] = useState("");
   const health = healthScore(tank);
@@ -309,6 +385,9 @@ function HomeTab({ tank, updateTank, showAds, onUpgrade, premium, setShowPaywall
 
   return (
     <>
+      {/* glanceable widget (home / lock-screen preview) */}
+      <GlanceWidget tank={tank} />
+
       {/* health dashboard — new feature */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
