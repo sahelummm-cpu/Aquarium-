@@ -33,7 +33,7 @@ export function CommunityTab({
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, base64: true });
     if (res.canceled) return;
     const asset = res.assets[0];
-    const src = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+    const src = asset.base64 ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}` : asset.uri;
     setCommunity([{ id: uid(), user: "you", tank: tank.name, src, likes: 0, mine: true }, ...community]);
   };
 

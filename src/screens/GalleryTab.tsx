@@ -36,7 +36,7 @@ export function GalleryTab({
     });
     if (res.canceled) return;
     const asset = res.assets[0];
-    const src = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+    const src = asset.base64 ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}` : asset.uri;
     updateTank(tank.id, {
       photos: [{ id: uid(), src, date: todayKey(), tag: "" }, ...photos],
     });

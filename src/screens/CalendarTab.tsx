@@ -41,7 +41,9 @@ export function CalendarTab({
 
   const onGridLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
-    setCell((w - GRID_GAP * 6) / 7);
+    // Floor so 7 cells + 6 gaps never exceed the row width (a fractional
+    // overflow would wrap the 7th day and break the month grid).
+    setCell(Math.floor((w - GRID_GAP * 6) / 7));
   };
 
   const addTask = () => {
