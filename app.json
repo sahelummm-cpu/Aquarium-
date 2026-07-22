@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Reeflog",
+    "slug": "reeflog",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "reeflog",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#061319",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#061319"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.reeflog.app"
+    },
+    "android": {
+      "package": "com.reeflog.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#061319"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Reeflog uses your photos to build your tank album and share tanks in the community showcase."
+        }
+      ]
+    ]
+  }
+}

@@ -1,67 +1,78 @@
 # Reeflog 🐟
 
 A bioluminescent **aquarium & reef tracker** — log water parameters, livestock,
-maintenance tasks and photos for every tank. Built as an installable PWA.
+maintenance tasks and photos for every tank. Built as a **native mobile app**
+with **React Native + Expo** (iOS & Android).
 
-## Why the Vercel deploy was 404-ing
+> Previously a Vite + React web PWA, Reeflog has been converted to a fully
+> native React Native app. Every screen was ported from web DOM/CSS to native
+> primitives (`View` / `Text` / `Pressable` / `TextInput` / `Image`), the SVG
+> charts now render through `react-native-svg`, gradients through
+> `expo-linear-gradient`, and data persists via `AsyncStorage`.
 
-The repository previously contained only a single `Reeflog.tsx` component with
-no build setup — no `package.json`, `index.html`, or bundler config. Vercel had
-nothing to build or serve, so every route returned `404: NOT_FOUND`.
-
-This project now ships a full **Vite + React + TypeScript** app around that
-component, which Vercel auto-detects and deploys.
-
-## Develop
+## Run it
 
 ```bash
 npm install
-npm run dev        # local dev server
-npm run build      # production build -> dist/
-npm run preview    # preview the production build
-npm run icons      # regenerate PNG icons from public/icon.svg
+npm start          # start the Expo dev server (press i / a, or scan the QR)
+npm run ios        # open in an iOS simulator (macOS)
+npm run android    # open on an Android emulator / device
+npm run web        # run in the browser via react-native-web
 ```
 
-## Deploying to Vercel
+Install the **Expo Go** app on your phone and scan the QR code from `npm start`
+to run it on a real device instantly.
 
-Vercel auto-detects the Vite framework (also pinned in `vercel.json`):
+## Building installable binaries
 
-- **Build command:** `vite build`
-- **Output directory:** `dist`
-- **Install command:** `npm install`
+Use [EAS Build](https://docs.expo.dev/build/introduction/) for store-ready apps:
 
-Push to the connected branch (or run `vercel --prod`) and the 404 is resolved.
+```bash
+npm install -g eas-cli
+eas build --platform ios
+eas build --platform android
+```
 
-## Icons / logo
+The app is configured for the New Architecture (`newArchEnabled`) and ships
+bundle identifiers `com.reeflog.app`.
 
-- `public/icon.svg` — the master vector logo (a glowing reef fish over a wave).
-- PNG variants (`favicon-32`, `icon-192`, `icon-512`, `apple-touch-icon`,
-  `icon-maskable-512`) are generated with `npm run icons` (uses `sharp`).
-- Referenced from `index.html` (favicon / apple-touch-icon) and
-  `public/manifest.webmanifest` (install icons).
+## Project structure
 
-## Widgets — home & lock screen
+```
+App.tsx                 # entry — SafeAreaProvider + StatusBar + <Reeflog/>
+index.ts                # registerRootComponent
+app.json                # Expo config (icons, splash, permissions, plugins)
+assets/                 # app icon, adaptive icon, splash
+src/
+  theme.ts              # abyssal / bioluminescent palette + fonts
+  storage.ts            # AsyncStorage-backed persistence (crash-safe auto-save)
+  data.ts               # domain data, seed tank, livestock DB, health score
+  ui.tsx                # shared native primitives (Card, Pill, Chip, Input, …)
+  Reeflog.tsx           # root: state, tanks, tab routing, paywall
+  components/           # Header (tank switcher), TabBar, Paywall
+  screens/              # Home, Calendar, Graphs, Gallery, Tools, Community, Settings
+```
 
-True OS widgets (iOS WidgetKit / Android App Widgets) require a **native** app
-and can't be delivered from a website. The web-native equivalents shipped here:
+## Features
 
-1. **Installable PWA** (`manifest.webmanifest` + `sw.js`) — adds a real Reeflog
-   icon to the phone home screen; opens standalone and works offline.
-2. **Home-screen shortcuts** — long-pressing the installed icon exposes quick
-   actions (Log a reading / Tasks / Gallery). These deep-link via `?tab=` and
-   act like a mini widget menu.
-3. **In-app glance widget** — the card at the top of the Home tab mirrors what a
-   home / lock-screen widget would show: tank health, next due task, and the
-   latest temperature and pH.
+- **Home** — glanceable widget, tank health score, due tasks, quick-log actions,
+  quick notes and an activity feed.
+- **Calendar** — month grid with recurring, priority-aware maintenance tasks.
+- **Graphs** — native SVG line charts per water parameter, custom threshold
+  lines, and CSV export.
+- **Gallery** — a photo timeline per tank (via the device photo library).
+- **Tools** — livestock database (add-your-own species), water-change &
+  dosing calculators, and multiple test timers.
+- **Community** — a tank showcase you can like and post to.
+- **Settings** — membership / paywall, on-device data management, backup.
 
 ## Data & persistence
 
-Reeflog persists through an async `window.storage` API. `src/main.tsx` provides
-a `localStorage`-backed shim so data survives reloads and works offline.
+Tank data auto-saves to `AsyncStorage` on every change and reloads on launch,
+so everything survives app restarts and works fully offline.
 
 ## Theme
 
-An abyssal / bioluminescent dark theme. Global shell styling (ambient backdrop,
-safe-area insets for the notch & home indicator, custom scrollbars, desktop
-phone-frame) lives in `src/index.css`; component styling is inline in
-`src/Reeflog.tsx`.
+An abyssal / bioluminescent dark theme lives in `src/theme.ts` and the shared
+`src/ui.tsx` kit. The app renders full-screen with safe-area insets for the
+notch and home indicator.
