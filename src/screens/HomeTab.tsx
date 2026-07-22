@@ -15,10 +15,14 @@ import {
   BellRing,
   Check,
   StickyNote,
+  Minus,
+  Plus,
+  Trash2,
 } from "lucide-react-native";
 import { T, FONT, MONO, CYAN_GRAD } from "../theme";
 import { Card, Label, Pill, Stat, IconButton, Input } from "../ui";
 import { Tank, healthScore, daysBetween, todayKey, uid } from "../data";
+import { scheduleTaskReminder, cancelReminder } from "../notifications";
 
 /* Glanceable widget — mirrors what a home / lock-screen widget shows. */
 function GlanceWidget({ tank }: { tank: Tank }) {
@@ -124,16 +128,28 @@ export function HomeTab({
     const entry = { id: uid(), date: todayKey(), type, note: "", photo: null };
     updateTank(tank.id, { logs: [entry, ...tank.logs] });
   };
-  const completeTask = (id: string) => {
+  const completeTask = async (id: string) => {
     const done = tank.tasks.find((t) => t.id === id);
+    if (!done) return;
+    const nextDate = new Date(Date.now() + done.every * 86400000).toISOString().slice(0, 10);
+    // Cancel the fired reminder and reschedule for the next occurrence.
+    cancelReminder(done.notifId);
+    const notifId = await scheduleTaskReminder({ ...done, next: nextDate }, tank.name);
     updateTank(tank.id, {
-      tasks: tank.tasks.map((t) =>
-        t.id === id
-          ? { ...t, next: new Date(Date.now() + t.every * 86400000).toISOString().slice(0, 10) }
-          : t
-      ),
-      logs: [{ id: uid(), date: todayKey(), type: done ? done.title : "Task", note: "", photo: null }, ...tank.logs],
+      tasks: tank.tasks.map((t) => (t.id === id ? { ...t, next: nextDate, notifId } : t)),
+      logs: [{ id: uid(), date: todayKey(), type: done.title, note: "", photo: null }, ...tank.logs],
     });
+  };
+
+  const changeQty = (id: string, delta: number) => {
+    updateTank(tank.id, {
+      livestock: tank.livestock
+        .map((l) => (l.id === id ? { ...l, qty: (l.qty || 1) + delta } : l))
+        .filter((l) => (l.qty || 0) > 0),
+    });
+  };
+  const removeLivestock = (id: string) => {
+    updateTank(tank.id, { livestock: tank.livestock.filter((l) => l.id !== id) });
   };
   const saveNote = () => {
     if (!quickNote.trim()) return;
@@ -174,6 +190,31 @@ export function HomeTab({
           <Stat label="Logs" value={tank.logs.length} icon={<Activity size={13} color={T.sub} />} />
         </View>
       </Card>
+
+      {/* livestock management */}
+      {tank.livestock.length > 0 && (
+        <Card>
+          <Label>LIVESTOCK</Label>
+          {tank.livestock.map((l) => (
+            <View key={l.id} style={styles.liveRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.liveName}>{l.name}</Text>
+                <Text style={styles.liveKind}>{l.kind}</Text>
+              </View>
+              <IconButton onPress={() => changeQty(l.id, -1)} accessibilityLabel="Decrease quantity" style={styles.qtyBtn}>
+                <Minus size={14} color={T.cyan} />
+              </IconButton>
+              <Text style={styles.qtyText}>{l.qty}</Text>
+              <IconButton onPress={() => changeQty(l.id, 1)} accessibilityLabel="Increase quantity" style={styles.qtyBtn}>
+                <Plus size={14} color={T.cyan} />
+              </IconButton>
+              <IconButton onPress={() => removeLivestock(l.id)} accessibilityLabel={`Remove ${l.name}`}>
+                <Trash2 size={15} color={T.danger} />
+              </IconButton>
+            </View>
+          ))}
+        </Card>
+      )}
 
       {/* due tasks */}
       {dueTasks.length > 0 && (
@@ -297,6 +338,12 @@ const styles = StyleSheet.create({
   healthBar: { height: 8, borderRadius: 6, backgroundColor: "#0a2731", marginTop: 12, overflow: "hidden" },
   healthFlag: { marginTop: 10, fontSize: 12, color: T.gold, fontFamily: FONT },
   healthStats: { flexDirection: "row", gap: 16, marginTop: 14 },
+
+  liveRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: T.line },
+  liveName: { fontSize: 14, fontWeight: "600", color: T.text, fontFamily: FONT },
+  liveKind: { fontSize: 11, color: T.sub, fontFamily: MONO, marginTop: 1 },
+  qtyBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: T.line },
+  qtyText: { fontSize: 15, fontWeight: "700", color: T.text, fontFamily: MONO, minWidth: 26, textAlign: "center" },
 
   dueRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: T.line },
   checkBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: T.cyan, borderRadius: 9 },

@@ -58,11 +58,14 @@ export function Pill({
     </View>
   );
 
+  const a11y = { accessibilityRole: "button" as const, accessibilityLabel: label, accessibilityState: { disabled: !!disabled } };
+
   if (variant === "gradient") {
     return (
       <Pressable
         onPress={onPress}
         disabled={disabled}
+        {...a11y}
         style={[s.pillBase, { overflow: "hidden" }, style, disabled && { opacity: 0.4 }]}
       >
         <LinearGradient colors={CYAN_GRAD} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
@@ -75,6 +78,7 @@ export function Pill({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      {...a11y}
       style={[
         s.pillBase,
         {
@@ -110,6 +114,9 @@ export function Chip({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
       style={[s.chip, { backgroundColor: active ? activeColor : T.card }, style]}
     >
       {icon}
@@ -170,13 +177,14 @@ export function Stat({ label, value, icon }: { label: string; value: React.React
   );
 }
 
-export function ToolHeader({ title, onBack }: { title: string; onBack: () => void }) {
+export function ToolHeader({ title, onBack, right }: { title: string; onBack: () => void; right?: React.ReactNode }) {
   return (
     <View style={s.toolHeader}>
-      <Pressable onPress={onBack} style={s.iconBtn}>
+      <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={s.iconBtn}>
         <ArrowLeft size={19} color={T.text} />
       </Pressable>
-      <Text style={s.toolTitle}>{title}</Text>
+      <Text style={[s.toolTitle, { flex: 1 }]}>{title}</Text>
+      {right}
     </View>
   );
 }
@@ -186,13 +194,20 @@ export function IconButton({
   onPress,
   children,
   style,
+  accessibilityLabel,
 }: {
   onPress?: () => void;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }) {
   return (
-    <Pressable onPress={onPress} style={[s.iconBtn, style]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={[s.iconBtn, style]}
+    >
       {children}
     </Pressable>
   );

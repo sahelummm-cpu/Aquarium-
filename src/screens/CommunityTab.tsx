@@ -6,6 +6,7 @@ import { Share2, Heart } from "lucide-react-native";
 import { T, FONT, MONO } from "../theme";
 import { Pill } from "../ui";
 import { Tank, CommunityPost, uid } from "../data";
+import { savePhoto } from "../photos";
 
 export function CommunityTab({
   tank,
@@ -33,7 +34,7 @@ export function CommunityTab({
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, base64: true });
     if (res.canceled) return;
     const asset = res.assets[0];
-    const src = asset.base64 ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}` : asset.uri;
+    const src = await savePhoto(asset.base64, asset.uri, asset.mimeType);
     setCommunity([{ id: uid(), user: "you", tank: tank.name, src, likes: 0, mine: true }, ...community]);
   };
 

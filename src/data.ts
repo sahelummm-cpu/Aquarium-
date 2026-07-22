@@ -88,7 +88,7 @@ export const SEED_COMMUNITY: CommunityPost[] = [
 export type Livestock = { id: string; name: string; qty: number; kind: string };
 export type Photo = { id: string; src: string; date: string; tag: string };
 export type LogEntry = { id: string; date: string; type: string; note: string; photo: string | null };
-export type Task = { id: string; title: string; every: number; next: string; priority: string; done: boolean };
+export type Task = { id: string; title: string; every: number; next: string; priority: string; done: boolean; notifId?: string | null };
 export type Threshold = { id: string; v: number; color: string };
 
 export type Tank = {
@@ -134,6 +134,21 @@ export function seedTank(): Tank {
 
 export function emptyTank(index: number): Tank {
   return { ...seedTank(), name: `Tank ${index}`, livestock: [], measures: {}, logs: [], tasks: [] };
+}
+
+/* Test timers are timestamp-based so they stay accurate across screen
+   navigation (the countdown is derived from `endsAt`, not a tick counter). */
+export type TimerItem = {
+  id: string;
+  label: string;
+  sec: number;
+  running: boolean;
+  endsAt: number | null;
+  leftWhenPaused: number;
+};
+
+export function defaultTimers(): TimerItem[] {
+  return [{ id: uid(), label: "Nitrate test", sec: 300, running: false, endsAt: null, leftWhenPaused: 300 }];
 }
 
 export function healthScore(tank: Tank): { score: number; flags: string[] } {

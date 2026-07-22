@@ -5,6 +5,7 @@ import { BarChart3, Trash2 } from "lucide-react-native";
 import { T, FONT, MONO } from "../theme";
 import { Card, Label, Pill, Chip, Input, IconButton } from "../ui";
 import { Tank, PARAM_PRESETS, todayKey, uid } from "../data";
+import { exportCSV as shareCSV } from "../backup";
 
 const VB_W = 300;
 const VB_H = 130;
@@ -46,12 +47,19 @@ export function GraphsTab({
     next[selParam] = (next[selParam] || []).filter((t) => t.id !== id);
     updateTank(tank.id, { thresholds: next });
   };
-  const exportCSV = () => {
+  const exportCSV = async () => {
     const rows: (string | number)[][] = [["param", "date", "value"]];
     PARAM_PRESETS.forEach((pp) => (tank.measures?.[pp.id] || []).forEach((mm) => rows.push([pp.name, mm.d, mm.v])));
-    const csv = rows.map((r) => r.join(",")).join("\n");
-    console.log("CSV EXPORT:\n" + csv);
-    Alert.alert("Export ready", `Prepared ${rows.length - 1} measurements as CSV. In-app this saves a .csv file you can share.`);
+    if (rows.length === 1) {
+      Alert.alert("Nothing to export", "Record a measurement first.");
+      return;
+    }
+    try {
+      const ok = await shareCSV(rows);
+      if (!ok) Alert.alert("Sharing unavailable", "This device can't open a share sheet.");
+    } catch {
+      Alert.alert("Export failed", "Could not write the CSV file.");
+    }
   };
 
   const thVals = thresholds.map((t) => t.v);

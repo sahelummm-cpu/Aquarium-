@@ -56,20 +56,38 @@ src/
 ## Features
 
 - **Home** — glanceable widget, tank health score, due tasks, quick-log actions,
-  quick notes and an activity feed.
+  quick notes, livestock management (adjust quantity / remove), and an activity
+  feed.
 - **Calendar** — month grid with recurring, priority-aware maintenance tasks.
+  Time-sensitive tasks schedule a local **notification** on their due date.
 - **Graphs** — native SVG line charts per water parameter, custom threshold
-  lines, and CSV export.
-- **Gallery** — a photo timeline per tank (via the device photo library).
+  lines, and real **CSV export** via the share sheet.
+- **Gallery** — a photo timeline per tank; images are stored on the filesystem
+  (not in the state blob) so albums scale safely.
 - **Tools** — livestock database (add-your-own species), water-change &
-  dosing calculators, and multiple test timers.
+  dosing calculators, and test timers that keep counting across navigation.
 - **Community** — a tank showcase you can like and post to.
-- **Settings** — membership / paywall, on-device data management, backup.
+- **Settings** — membership / paywall, JSON **backup export & restore**, and
+  delete-tank.
+- **Home-screen quick actions** — long-press the app icon to jump straight to
+  Log / Tasks / Graphs / Gallery.
 
 ## Data & persistence
 
 Tank data auto-saves to `AsyncStorage` on every change and reloads on launch,
-so everything survives app restarts and works fully offline.
+so everything survives app restarts and works fully offline. Photos are written
+to the app's document directory and referenced by URI, keeping the persisted
+state small (and avoiding Android's AsyncStorage size limit). Full backups can
+be exported to / restored from a JSON file.
+
+## Native modules
+
+`expo-file-system` (photo storage & file export), `expo-sharing`,
+`expo-document-picker` (backup restore), `expo-notifications` (task reminders),
+`expo-image-picker`, `expo-quick-actions`, `expo-linear-gradient`,
+`react-native-svg`, `@react-native-community/slider`,
+`@react-native-async-storage/async-storage`, `react-native-safe-area-context`,
+and `lucide-react-native`.
 
 ## Theme
 

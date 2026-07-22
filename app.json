@@ -35,7 +35,14 @@
         {
           "photosPermission": "Reeflog uses your photos to build your tank album and share tanks in the community showcase."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#3fe0d0"
+        }
+      ],
+      "expo-quick-actions"
     ]
   }
 }

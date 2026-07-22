@@ -11,22 +11,32 @@ import {
   StickyNote,
   Upload,
   Download,
+  Trash2,
 } from "lucide-react-native";
 import { T, FONT, MONO } from "../theme";
-import { Card, Pill, IconButton } from "../ui";
+import { Card, Pill, IconButton, ToolHeader } from "../ui";
 import { Tank } from "../data";
 import { rawBackup } from "../storage";
+import { exportBackup, importBackup } from "../backup";
 
 export function SettingsTab({
   premium,
   adsRemoved,
   onUpgrade,
   tanks,
+  activeId,
+  onDeleteTank,
+  onImport,
+  onBack,
 }: {
   premium: boolean;
   adsRemoved: boolean;
   onUpgrade: () => void;
   tanks: Tank[];
+  activeId: string | null;
+  onDeleteTank: (id: string) => void;
+  onImport: (data: any) => void;
+  onBack: () => void;
 }) {
   const [dataView, setDataView] = useState(false);
   const dataCount = tanks.reduce(
@@ -40,9 +50,42 @@ export function SettingsTab({
   );
 
   const exportData = async () => {
-    const blob = await rawBackup();
-    console.log("BACKUP EXPORT:\n" + blob);
-    Alert.alert("Backup ready", `Backed up ${dataCount} records. In-app this uploads to your cloud account.`);
+    try {
+      const blob = await rawBackup();
+      const ok = await exportBackup(blob);
+      if (!ok) Alert.alert("Sharing unavailable", "This device can't open a share sheet.");
+    } catch {
+      Alert.alert("Export failed", "Could not write the backup file.");
+    }
+  };
+
+  const importData = async () => {
+    try {
+      const data = await importBackup();
+      if (!data) return;
+      if (!data || !Array.isArray(data.tanks) || data.tanks.length === 0) {
+        Alert.alert("Invalid backup", "That file doesn't look like a Reeflog backup.");
+        return;
+      }
+      Alert.alert("Restore backup?", "This replaces all tanks and data currently on this device.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Restore", style: "destructive", onPress: () => onImport(data) },
+      ]);
+    } catch {
+      Alert.alert("Import failed", "Could not read that file.");
+    }
+  };
+
+  const confirmDeleteTank = () => {
+    if (tanks.length <= 1) {
+      Alert.alert("Can't delete", "You need at least one tank.");
+      return;
+    }
+    const t = tanks.find((x) => x.id === activeId);
+    Alert.alert("Delete tank?", `Permanently delete “${t?.name}” and all its logs, photos and tasks?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => activeId && onDeleteTank(activeId) },
+    ]);
   };
 
   if (dataView) {
@@ -84,7 +127,7 @@ export function SettingsTab({
           icon={<Download size={16} color={T.cyan} />}
           label="Import (Download)"
           locked={!premium}
-          onPress={premium ? () => Alert.alert("Restore", "In-app this restores from your cloud backup.") : onUpgrade}
+          onPress={premium ? importData : onUpgrade}
         />
 
         <Text style={styles.dataNote}>
@@ -99,6 +142,7 @@ export function SettingsTab({
 
   return (
     <View>
+      <ToolHeader title="Settings" onBack={onBack} />
       {!premium && (
         <Pressable onPress={onUpgrade} style={styles.promoWrap}>
           <LinearGradient colors={[T.cyanDim, "#0d3540"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
@@ -131,8 +175,13 @@ export function SettingsTab({
           title="Tanks"
           sub={`${tanks.length} tank${tanks.length > 1 ? "s" : ""} · auto-saved`}
         />
-        <Row icon={<Bell size={16} color={T.cyan} />} title="Notifications" sub="Time-sensitive alerts enabled" last />
+        <Row icon={<Bell size={16} color={T.cyan} />} title="Notifications" sub="Reminders for time-sensitive tasks" last />
       </Card>
+
+      <Pressable onPress={confirmDeleteTank} style={styles.deleteBtn}>
+        <Trash2 size={16} color={T.danger} />
+        <Text style={styles.deleteText}>Delete current tank</Text>
+      </Pressable>
 
       <Text style={styles.footer}>Reeflog v1.0 · data stored on-device</Text>
     </View>
@@ -222,5 +271,18 @@ const styles = StyleSheet.create({
   rowIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: T.card, alignItems: "center", justifyContent: "center" },
   rowTitle: { fontSize: 14, fontWeight: "600", color: T.text, fontFamily: FONT },
   rowSub: { fontSize: 12, color: T.sub, fontFamily: FONT },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 13,
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.danger + "44",
+    backgroundColor: T.danger + "12",
+  },
+  deleteText: { color: T.danger, fontSize: 14, fontWeight: "600", fontFamily: FONT },
   footer: { textAlign: "center", fontSize: 11, color: T.sub, marginTop: 20, fontFamily: MONO },
 });

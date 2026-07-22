@@ -18,11 +18,13 @@ export async function loadState<T = any>(): Promise<T | null> {
   }
 }
 
-export async function saveState(state: unknown): Promise<void> {
+/** Returns false when the write failed (e.g. storage quota exceeded). */
+export async function saveState(state: unknown): Promise<boolean> {
   try {
     await AsyncStorage.setItem(KEY, JSON.stringify(state));
+    return true;
   } catch {
-    /* quota / serialization error — ignore, app stays in-memory */
+    return false;
   }
 }
 

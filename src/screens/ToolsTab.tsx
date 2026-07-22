@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Slider from "@react-native-community/slider";
@@ -21,7 +21,7 @@ import {
 } from "lucide-react-native";
 import { T, FONT, MONO, CYAN_GRAD } from "../theme";
 import { Card, Label, Pill, Chip, Input, Tag, ToolHeader } from "../ui";
-import { Tank, Species, FISH_DB, gradFor, uid } from "../data";
+import { Tank, Species, TimerItem, FISH_DB, gradFor, uid } from "../data";
 
 type ToolView = "menu" | "database" | "dosing" | "wc" | "timers";
 
@@ -39,6 +39,8 @@ export function ToolsTab({
   onUpgrade,
   customFish,
   setCustomFish,
+  timers,
+  setTimers,
 }: {
   tank: Tank;
   updateTank: (id: string, patch: Partial<Tank>) => void;
@@ -46,6 +48,8 @@ export function ToolsTab({
   onUpgrade: () => void;
   customFish: Species[];
   setCustomFish: (next: Species[]) => void;
+  timers: TimerItem[];
+  setTimers: React.Dispatch<React.SetStateAction<TimerItem[]>>;
 }) {
   const [view, setView] = useState<ToolView>("menu");
   const back = () => setView("menu");
@@ -54,7 +58,7 @@ export function ToolsTab({
     return <Database tank={tank} updateTank={updateTank} customFish={customFish} setCustomFish={setCustomFish} back={back} />;
   if (view === "dosing") return <DosingCalc tank={tank} back={back} />;
   if (view === "wc") return <WaterChangeCalc tank={tank} back={back} />;
-  if (view === "timers") return <Timers back={back} />;
+  if (view === "timers") return <Timers timers={timers} setTimers={setTimers} back={back} />;
 
   return (
     <View>
@@ -346,55 +350,75 @@ function DosingCalc({ tank, back }: { tank: Tank; back: () => void }) {
   );
 }
 
-/* ---- Test timers ---- */
-type TimerItem = { id: string; label: string; sec: number; left: number; running: boolean };
+/* ---- Test timers (timestamp-based, state lifted to the app root) ---- */
+const remaining = (t: TimerItem) =>
+  t.running && t.endsAt != null ? Math.max(0, Math.round((t.endsAt - Date.now()) / 1000)) : t.leftWhenPaused;
 
-function Timers({ back }: { back: () => void }) {
-  const [timers, setTimers] = useState<TimerItem[]>([
-    { id: uid(), label: "Nitrate test", sec: 300, left: 300, running: false },
-  ]);
-  const timersRef = useRef(timers);
-  timersRef.current = timers;
+function Timers({
+  timers,
+  setTimers,
+  back,
+}: {
+  timers: TimerItem[];
+  setTimers: React.Dispatch<React.SetStateAction<TimerItem[]>>;
+  back: () => void;
+}) {
+  const [, setTick] = useState(0);
 
+  // Re-render once a second while the screen is mounted; the actual
+  // countdown is derived from each timer's `endsAt` timestamp.
   useEffect(() => {
-    const iv = setInterval(() => {
-      setTimers((ts) => ts.map((t) => (t.running && t.left > 0 ? { ...t, left: t.left - 1 } : t)));
-    }, 1000);
+    const iv = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(iv);
   }, []);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  const add = () => setTimers((ts) => [...ts, { id: uid(), label: "New test", sec: 180, left: 180, running: false }]);
-  const toggle = (id: string) => setTimers((ts) => ts.map((t) => (t.id === id ? { ...t, running: !t.running } : t)));
-  const reset = (id: string) => setTimers((ts) => ts.map((t) => (t.id === id ? { ...t, left: t.sec, running: false } : t)));
+  const add = () =>
+    setTimers((ts) => [...ts, { id: uid(), label: "New test", sec: 180, running: false, endsAt: null, leftWhenPaused: 180 }]);
+  const toggle = (id: string) =>
+    setTimers((ts) =>
+      ts.map((t) => {
+        if (t.id !== id) return t;
+        if (t.running) {
+          return { ...t, running: false, leftWhenPaused: remaining(t), endsAt: null };
+        }
+        const left = t.leftWhenPaused > 0 ? t.leftWhenPaused : t.sec;
+        return { ...t, running: true, endsAt: Date.now() + left * 1000, leftWhenPaused: left };
+      })
+    );
+  const reset = (id: string) =>
+    setTimers((ts) => ts.map((t) => (t.id === id ? { ...t, running: false, endsAt: null, leftWhenPaused: t.sec } : t)));
   const remove = (id: string) => setTimers((ts) => ts.filter((t) => t.id !== id));
   const setDur = (id: string, sec: number) =>
-    setTimers((ts) => ts.map((t) => (t.id === id ? { ...t, sec, left: sec, running: false } : t)));
+    setTimers((ts) => ts.map((t) => (t.id === id ? { ...t, sec, running: false, endsAt: null, leftWhenPaused: sec } : t)));
   const setLabel = (id: string, label: string) => setTimers((ts) => ts.map((t) => (t.id === id ? { ...t, label } : t)));
 
   return (
     <View>
       <ToolHeader title="Test Timers" onBack={back} />
-      {timers.map((t) => (
-        <Card key={t.id}>
-          <View style={styles.timerHead}>
-            <Input value={t.label} onChangeText={(v) => setLabel(t.id, v)} style={styles.timerLabel} />
-            <Pressable onPress={() => remove(t.id)} style={styles.closeBtn}>
-              <Trash2 size={15} color={T.danger} />
-            </Pressable>
-          </View>
-          <Text style={[styles.timerTime, { color: t.left === 0 ? T.coral : t.running ? T.cyan : T.text }]}>{fmt(t.left)}</Text>
-          <View style={styles.timerDurs}>
-            {[60, 180, 300, 600].map((d) => (
-              <Chip key={d} label={`${d / 60}m`} active={t.sec === d} onPress={() => setDur(t.id, d)} />
-            ))}
-          </View>
-          <View style={styles.timerActions}>
-            <Pill label={t.running ? "Pause" : "Start"} onPress={() => toggle(t.id)} style={{ flex: 1, paddingVertical: 10 }} />
-            <Pill label="Reset" variant="outline" onPress={() => reset(t.id)} style={{ paddingHorizontal: 16 }} />
-          </View>
-        </Card>
-      ))}
+      {timers.map((t) => {
+        const left = remaining(t);
+        return (
+          <Card key={t.id}>
+            <View style={styles.timerHead}>
+              <Input value={t.label} onChangeText={(v) => setLabel(t.id, v)} style={styles.timerLabel} />
+              <Pressable onPress={() => remove(t.id)} accessibilityRole="button" accessibilityLabel="Delete timer" style={styles.closeBtn}>
+                <Trash2 size={15} color={T.danger} />
+              </Pressable>
+            </View>
+            <Text style={[styles.timerTime, { color: left === 0 ? T.coral : t.running ? T.cyan : T.text }]}>{fmt(left)}</Text>
+            <View style={styles.timerDurs}>
+              {[60, 180, 300, 600].map((d) => (
+                <Chip key={d} label={`${d / 60}m`} active={t.sec === d} onPress={() => setDur(t.id, d)} />
+              ))}
+            </View>
+            <View style={styles.timerActions}>
+              <Pill label={t.running ? "Pause" : "Start"} onPress={() => toggle(t.id)} style={{ flex: 1, paddingVertical: 10 }} />
+              <Pill label="Reset" variant="outline" onPress={() => reset(t.id)} style={{ paddingHorizontal: 16 }} />
+            </View>
+          </Card>
+        );
+      })}
       <Pill variant="dashed" label="Add timer" icon={<Plus size={15} color={T.cyan} />} onPress={add} style={{ paddingVertical: 12 }} />
     </View>
   );

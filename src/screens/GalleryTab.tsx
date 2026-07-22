@@ -3,19 +3,22 @@ import { View, Text, Image, Pressable, StyleSheet, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Image as ImageIcon, X } from "lucide-react-native";
 import { T, FONT, MONO } from "../theme";
-import { Label, Pill } from "../ui";
-import { Tank, todayKey, uid } from "../data";
+import { Label, Pill, ToolHeader } from "../ui";
+import { Tank, Photo, todayKey, uid } from "../data";
+import { savePhoto, deletePhoto } from "../photos";
 
 export function GalleryTab({
   tank,
   updateTank,
   premium,
   onUpgrade,
+  onBack,
 }: {
   tank: Tank;
   updateTank: (id: string, patch: Partial<Tank>) => void;
   premium: boolean;
   onUpgrade: () => void;
+  onBack: () => void;
 }) {
   const photos = tank.photos || [];
 
@@ -29,27 +32,26 @@ export function GalleryTab({
       Alert.alert("Permission needed", "Allow photo access to add tank photos.");
       return;
     }
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.7,
-      base64: true,
-    });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, base64: true });
     if (res.canceled) return;
     const asset = res.assets[0];
-    const src = asset.base64 ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}` : asset.uri;
-    updateTank(tank.id, {
-      photos: [{ id: uid(), src, date: todayKey(), tag: "" }, ...photos],
-    });
+    const src = await savePhoto(asset.base64, asset.uri, asset.mimeType);
+    const photo: Photo = { id: uid(), src, date: todayKey(), tag: "" };
+    updateTank(tank.id, { photos: [photo, ...photos] });
   };
 
-  const remove = (id: string) => updateTank(tank.id, { photos: photos.filter((p) => p.id !== id) });
+  const remove = (p: Photo) => {
+    deletePhoto(p.src);
+    updateTank(tank.id, { photos: photos.filter((x) => x.id !== p.id) });
+  };
 
   return (
     <View>
-      <View style={styles.head}>
-        <Label>{tank.name} · Album</Label>
-        <Pill label="Add photo" icon={<Camera size={14} color={T.ink} />} onPress={add} />
-      </View>
+      <ToolHeader
+        title={`${tank.name} · Album`}
+        onBack={onBack}
+        right={<Pill label="Add photo" icon={<Camera size={14} color={T.ink} />} onPress={add} />}
+      />
 
       {photos.length === 0 ? (
         <View style={styles.empty}>
@@ -65,7 +67,7 @@ export function GalleryTab({
               <View style={styles.caption}>
                 <Text style={styles.captionText}>{p.date}</Text>
               </View>
-              <Pressable onPress={() => remove(p.id)} style={styles.removeBtn}>
+              <Pressable onPress={() => remove(p)} accessibilityRole="button" accessibilityLabel="Remove photo" style={styles.removeBtn}>
                 <X size={13} color="#fff" />
               </Pressable>
             </View>
@@ -81,7 +83,6 @@ export function GalleryTab({
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 4, marginBottom: 10 },
   empty: { alignItems: "center", paddingVertical: 48, paddingHorizontal: 20 },
   emptyTitle: { fontSize: 14, color: T.sub, fontFamily: FONT, textAlign: "center" },
   emptySub: { fontSize: 12, color: T.sub, marginTop: 4, fontFamily: FONT, textAlign: "center" },

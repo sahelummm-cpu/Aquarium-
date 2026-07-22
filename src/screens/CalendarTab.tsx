@@ -4,7 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ChevronLeft, ChevronRight, Plus, BellRing, Bell, Trash2, X, Check } from "lucide-react-native";
 import { T, FONT, MONO, CYAN_GRAD } from "../theme";
 import { Card, Label, Pill, Chip, Input, IconButton } from "../ui";
-import { Tank, todayKey, uid } from "../data";
+import { Tank, Task, todayKey, uid } from "../data";
+import { scheduleTaskReminder, cancelReminder } from "../notifications";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const GRID_GAP = 4;
@@ -46,25 +47,26 @@ export function CalendarTab({
     setCell(Math.floor((w - GRID_GAP * 6) / 7));
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!form.title.trim()) return;
-    updateTank(tank.id, {
-      tasks: [
-        ...tank.tasks,
-        {
-          id: uid(),
-          title: form.title.trim(),
-          every: Number(form.every),
-          next: sel,
-          priority: form.priority,
-          done: false,
-        },
-      ],
-    });
+    const task: Task = {
+      id: uid(),
+      title: form.title.trim(),
+      every: Number(form.every),
+      next: sel,
+      priority: form.priority,
+      done: false,
+    };
     setForm({ title: "", every: 7, priority: "normal" });
     setAdding(false);
+    task.notifId = await scheduleTaskReminder(task, tank.name);
+    updateTank(tank.id, { tasks: [...tank.tasks, task] });
   };
-  const removeTask = (id: string) => updateTank(tank.id, { tasks: tank.tasks.filter((t) => t.id !== id) });
+  const removeTask = (id: string) => {
+    const t = tank.tasks.find((x) => x.id === id);
+    cancelReminder(t?.notifId);
+    updateTank(tank.id, { tasks: tank.tasks.filter((x) => x.id !== id) });
+  };
 
   return (
     <View>
