@@ -21,12 +21,13 @@ import {
 } from "lucide-react-native";
 import { T, FONT, MONO, CYAN_GRAD } from "../theme";
 import { Card, Label, Pill, Stat, IconButton, Input } from "../ui";
-import { Tank, healthScore, daysBetween, todayKey, uid } from "../data";
+import { Tank, ParamPreset, healthScore, daysBetween, todayKey, uid } from "../data";
+import { Units, fmtTemp } from "../units";
 import { scheduleTaskReminder, cancelReminder } from "../notifications";
 
 /* Glanceable widget — mirrors what a home / lock-screen widget shows. */
-function GlanceWidget({ tank }: { tank: Tank }) {
-  const health = healthScore(tank);
+function GlanceWidget({ tank, units, params }: { tank: Tank; units: Units; params: ParamPreset[] }) {
+  const health = healthScore(tank, params);
   const upcoming = [...tank.tasks]
     .filter((t) => !t.done)
     .sort((a, b) => new Date(a.next).getTime() - new Date(b.next).getTime())[0];
@@ -66,7 +67,7 @@ function GlanceWidget({ tank }: { tank: Tank }) {
 
       <View style={styles.widgetChips}>
         <WChip icon={<Timer size={13} color={nextIn != null && nextIn <= 0 ? T.coral : T.cyan} />} label="Next task" value={dueLabel} />
-        <WChip icon={<Thermometer size={13} color={T.coral} />} label="Temp" value={temp != null ? `${temp}°` : "—"} />
+        <WChip icon={<Thermometer size={13} color={T.coral} />} label="Temp" value={temp != null ? fmtTemp(temp, units) : "—"} />
         <WChip icon={<FlaskConical size={13} color={T.cyan} />} label="pH" value={ph != null ? `${ph}` : "—"} />
       </View>
     </View>
@@ -112,14 +113,18 @@ export function HomeTab({
   updateTank,
   showAds,
   onUpgrade,
+  units,
+  params,
 }: {
   tank: Tank;
   updateTank: (id: string, patch: Partial<Tank>) => void;
   showAds: boolean;
   onUpgrade: () => void;
+  units: Units;
+  params: ParamPreset[];
 }) {
   const [quickNote, setQuickNote] = useState("");
-  const health = healthScore(tank);
+  const health = healthScore(tank, params);
   const dueTasks = tank.tasks.filter((t) => !t.done && daysBetween(todayKey(), t.next) <= 0);
   const scoreColor = health.score >= 80 ? T.good : health.score >= 55 ? T.gold : T.danger;
   const fishCount = tank.livestock.reduce((a, l) => a + (l.qty || 1), 0);
@@ -161,7 +166,7 @@ export function HomeTab({
 
   return (
     <View>
-      <GlanceWidget tank={tank} />
+      <GlanceWidget tank={tank} units={units} params={params} />
 
       {/* health dashboard */}
       <Card>

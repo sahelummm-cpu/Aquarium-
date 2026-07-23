@@ -60,15 +60,21 @@ src/
   feed.
 - **Calendar** — month grid with recurring, priority-aware maintenance tasks.
   Time-sensitive tasks schedule a local **notification** on their due date.
-- **Graphs** — native SVG line charts per water parameter, custom threshold
-  lines, and real **CSV export** via the share sheet.
-- **Gallery** — a photo timeline per tank; images are stored on the filesystem
-  (not in the state blob) so albums scale safely.
+- **Graphs** — native SVG line charts per water parameter, **custom parameters**
+  (premium), custom threshold lines, and real **CSV export** via the share sheet.
+- **Gallery** — a photo timeline per tank with a full-screen viewer and editable
+  captions; add from the **library or camera**. Images are stored on the
+  filesystem (not the state blob) so albums scale safely.
 - **Tools** — livestock database (add-your-own species), water-change &
-  dosing calculators, and test timers that keep counting across navigation.
-- **Community** — a tank showcase you can like and post to.
-- **Settings** — membership / paywall, JSON **backup export & restore**, and
-  delete-tank.
+  dosing calculators (unit-aware), and test timers that keep counting across
+  navigation.
+- **Community** — a tank showcase you can like (persisted) and post to.
+- **Settings** — membership / paywall, **units toggle (°F/°C · gal/L)**,
+  **notification controls** (on/off + reminder time), **edit tank** details,
+  JSON **backup export & restore**, and delete-tank.
+
+Tasks are **editable** (tap to edit) and time-sensitive ones reschedule their
+reminder automatically.
 - **Home-screen quick actions** — long-press the app icon to jump straight to
   Log / Tasks / Graphs / Gallery.
 

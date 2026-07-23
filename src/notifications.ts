@@ -22,6 +22,12 @@ Notifications.setNotificationHandler({
 
 let permissionAsked = false;
 
+/* User preferences, mirrored from persisted app settings. */
+let prefs = { enabled: true, hour: 9 };
+export function setNotifPrefs(next: { enabled: boolean; hour: number }) {
+  prefs = next;
+}
+
 export async function ensureNotificationPermission(): Promise<boolean> {
   try {
     if (Platform.OS === "android") {
@@ -43,9 +49,10 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   }
 }
 
-/** Reminder fires at 09:00 local on the task's due date. */
+/** Reminder fires at the user's chosen hour (local) on the task's due date. */
 function reminderDate(dateKey: string): Date | null {
-  const d = new Date(`${dateKey}T09:00:00`);
+  const hh = String(prefs.hour).padStart(2, "0");
+  const d = new Date(`${dateKey}T${hh}:00:00`);
   if (isNaN(d.getTime())) return null;
   if (d.getTime() <= Date.now()) return null; // don't schedule in the past
   return d;
@@ -57,6 +64,7 @@ function reminderDate(dateKey: string): Date | null {
  * permission).
  */
 export async function scheduleTaskReminder(task: Task, tankName: string): Promise<string | null> {
+  if (!prefs.enabled) return null;
   if (task.priority !== "timeSensitive") return null;
   const when = reminderDate(task.next);
   if (!when) return null;
@@ -86,5 +94,13 @@ export async function cancelReminder(notifId?: string | null): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(notifId);
   } catch {
     /* already fired or cancelled — ignore */
+  }
+}
+
+export async function cancelAllReminders(): Promise<void> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {
+    /* ignore */
   }
 }

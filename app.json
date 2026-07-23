@@ -33,7 +33,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Reeflog uses your photos to build your tank album and share tanks in the community showcase."
+          "photosPermission": "Reeflog uses your photos to build your tank album and share tanks in the community showcase.",
+          "cameraPermission": "Reeflog uses your camera to take photos of your tank for its album."
         }
       ],
       [

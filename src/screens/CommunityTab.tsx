@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, Image, Pressable, StyleSheet, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
@@ -12,13 +12,15 @@ export function CommunityTab({
   tank,
   community,
   setCommunity,
+  liked,
+  setLiked,
 }: {
   tank: Tank;
   community: CommunityPost[];
   setCommunity: (next: CommunityPost[]) => void;
+  liked: Record<string, boolean>;
+  setLiked: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
-  const [liked, setLiked] = useState<Record<string, boolean>>({});
-
   const toggleLike = (id: string) => {
     const isLiked = !!liked[id];
     setLiked((l) => ({ ...l, [id]: !isLiked }));

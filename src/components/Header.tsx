@@ -5,10 +5,12 @@ import { Waves, Image as ImageIcon, Crown, Settings, Fish, Plus } from "lucide-r
 import { T, FONT, MONO, CYAN_GRAD } from "../theme";
 import { IconButton } from "../ui";
 import { Tank, daysBetween, todayKey } from "../data";
+import { Units, fmtVol } from "../units";
 
 export function Header({
   active,
   tanks,
+  units,
   topInset,
   onSelect,
   onAddTank,
@@ -19,6 +21,7 @@ export function Header({
 }: {
   active?: Tank;
   tanks: Tank[];
+  units: Units;
   topInset: number;
   onSelect: (id: string) => void;
   onAddTank: () => void;
@@ -82,7 +85,7 @@ export function Header({
 
       {active && (
         <Text style={styles.meta}>
-          {active.type} · {active.volume} gal · {age} days old
+          {active.type} · {fmtVol(active.volume, units)} · {age} days old
         </Text>
       )}
     </View>

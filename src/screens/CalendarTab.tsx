@@ -25,6 +25,7 @@ export function CalendarTab({
     every: 7,
     priority: "normal",
   });
+  const [editId, setEditId] = useState<string | null>(null);
   const [cell, setCell] = useState(40);
 
   const y = month.getFullYear();
@@ -47,20 +48,48 @@ export function CalendarTab({
     setCell(Math.floor((w - GRID_GAP * 6) / 7));
   };
 
-  const addTask = async () => {
-    if (!form.title.trim()) return;
-    const task: Task = {
-      id: uid(),
-      title: form.title.trim(),
-      every: Number(form.every),
-      next: sel,
-      priority: form.priority,
-      done: false,
-    };
+  const openAdd = () => {
+    setEditId(null);
     setForm({ title: "", every: 7, priority: "normal" });
+    setAdding(true);
+  };
+  const openEdit = (t: Task) => {
+    setEditId(t.id);
+    setForm({ title: t.title, every: t.every, priority: t.priority });
+    setAdding(true);
+  };
+  const cancelForm = () => {
     setAdding(false);
-    task.notifId = await scheduleTaskReminder(task, tank.name);
-    updateTank(tank.id, { tasks: [...tank.tasks, task] });
+    setEditId(null);
+    setForm({ title: "", every: 7, priority: "normal" });
+  };
+
+  const saveTask = async () => {
+    if (!form.title.trim()) return;
+    if (editId) {
+      const existing = tank.tasks.find((t) => t.id === editId);
+      cancelReminder(existing?.notifId);
+      const base: Task = {
+        ...(existing as Task),
+        title: form.title.trim(),
+        every: Number(form.every),
+        priority: form.priority,
+      };
+      const notifId = await scheduleTaskReminder(base, tank.name);
+      updateTank(tank.id, { tasks: tank.tasks.map((t) => (t.id === editId ? { ...base, notifId } : t)) });
+    } else {
+      const task: Task = {
+        id: uid(),
+        title: form.title.trim(),
+        every: Number(form.every),
+        next: sel,
+        priority: form.priority,
+        done: false,
+      };
+      task.notifId = await scheduleTaskReminder(task, tank.name);
+      updateTank(tank.id, { tasks: [...tank.tasks, task] });
+    }
+    cancelForm();
   };
   const removeTask = (id: string) => {
     const t = tank.tasks.find((x) => x.id === id);
@@ -125,12 +154,13 @@ export function CalendarTab({
 
       <View style={styles.selRow}>
         <Label>{sel}</Label>
-        <Pill label="Schedule" icon={<Plus size={13} color={T.ink} />} onPress={() => setAdding(true)} />
+        <Pill label="Schedule" icon={<Plus size={13} color={T.ink} />} onPress={openAdd} />
       </View>
 
       {adding && (
         <Card>
-          <Input autoFocus value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} placeholder="Task name" />
+          <Label>{editId ? "EDIT TASK" : "NEW TASK"}</Label>
+          <Input autoFocus value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} placeholder="Task name" style={{ marginTop: 10 }} />
           <View style={styles.repeatRow}>
             <Text style={styles.formHint}>Repeat every</Text>
             {[1, 3, 7, 14, 30].map((n) => (
@@ -149,8 +179,8 @@ export function CalendarTab({
             />
           </View>
           <View style={styles.formActions}>
-            <Pill label="Add task" onPress={addTask} style={{ flex: 1, paddingVertical: 10 }} />
-            <IconButton onPress={() => setAdding(false)} style={{ width: 40 }}>
+            <Pill label={editId ? "Save changes" : "Add task"} onPress={saveTask} style={{ flex: 1, paddingVertical: 10 }} />
+            <IconButton onPress={cancelForm} style={{ width: 40 }} accessibilityLabel="Cancel">
               <X size={16} color={T.sub} />
             </IconButton>
           </View>
@@ -161,13 +191,13 @@ export function CalendarTab({
         <Card key={t.id}>
           <View style={styles.taskRow}>
             <Bell size={16} color={t.priority === "timeSensitive" ? T.coral : T.cyan} />
-            <View style={{ flex: 1 }}>
+            <Pressable onPress={() => openEdit(t)} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel={`Edit ${t.title}`}>
               <Text style={styles.taskTitle}>{t.title}</Text>
               <Text style={styles.taskMeta}>
-                every {t.every}d {t.priority === "timeSensitive" ? "· time-sensitive" : ""}
+                every {t.every}d {t.priority === "timeSensitive" ? "· time-sensitive" : ""} · tap to edit
               </Text>
-            </View>
-            <IconButton onPress={() => removeTask(t.id)}>
+            </Pressable>
+            <IconButton onPress={() => removeTask(t.id)} accessibilityLabel={`Delete ${t.title}`}>
               <Trash2 size={15} color={T.danger} />
             </IconButton>
           </View>

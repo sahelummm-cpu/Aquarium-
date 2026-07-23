@@ -17,7 +17,11 @@ export type ParamPreset = {
   color: string;
   lo: number;
   hi: number;
+  custom?: boolean;
 };
+
+/* Palette custom parameters cycle through for their chart colour. */
+export const CUSTOM_PARAM_COLORS = ["#a78bfa", "#60a5fa", "#f472b6", "#fbbf24", "#34d399", "#fb7185"];
 
 export const PARAM_PRESETS: ParamPreset[] = [
   { id: "ph", name: "pH", unit: "", color: T.cyan, lo: 6.5, hi: 8.4 },
@@ -151,10 +155,10 @@ export function defaultTimers(): TimerItem[] {
   return [{ id: uid(), label: "Nitrate test", sec: 300, running: false, endsAt: null, leftWhenPaused: 300 }];
 }
 
-export function healthScore(tank: Tank): { score: number; flags: string[] } {
+export function healthScore(tank: Tank, params: ParamPreset[] = PARAM_PRESETS): { score: number; flags: string[] } {
   let score = 100;
   const flags: string[] = [];
-  PARAM_PRESETS.forEach((p) => {
+  params.forEach((p) => {
     const arr = tank.measures?.[p.id];
     if (!arr?.length) return;
     const v = arr[arr.length - 1].v;

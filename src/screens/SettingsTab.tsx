@@ -1,10 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, Alert } from "react-native";
+import { View, Text, Pressable, StyleSheet, Alert, Switch } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Crown,
   Cloud,
-  Waves,
   Bell,
   ChevronRight,
   ArrowLeft,
@@ -12,10 +11,15 @@ import {
   Upload,
   Download,
   Trash2,
+  Ruler,
+  Pencil,
+  Minus,
+  Plus,
 } from "lucide-react-native";
 import { T, FONT, MONO } from "../theme";
-import { Card, Pill, IconButton, ToolHeader } from "../ui";
+import { Card, Pill, Chip, Input, IconButton, ToolHeader, Label } from "../ui";
 import { Tank } from "../data";
+import { Units, volUnit, toDisplayVol, fromDisplayVol } from "../units";
 import { rawBackup } from "../storage";
 import { exportBackup, importBackup } from "../backup";
 
@@ -25,6 +29,12 @@ export function SettingsTab({
   onUpgrade,
   tanks,
   activeId,
+  units,
+  onSetUnits,
+  notifEnabled,
+  reminderHour,
+  onSetNotif,
+  onEditTank,
   onDeleteTank,
   onImport,
   onBack,
@@ -34,11 +44,19 @@ export function SettingsTab({
   onUpgrade: () => void;
   tanks: Tank[];
   activeId: string | null;
+  units: Units;
+  onSetUnits: (u: Units) => void;
+  notifEnabled: boolean;
+  reminderHour: number;
+  onSetNotif: (enabled: boolean, hour: number) => void;
+  onEditTank: (id: string, patch: Partial<Tank>) => void;
   onDeleteTank: (id: string) => void;
   onImport: (data: any) => void;
   onBack: () => void;
 }) {
   const [dataView, setDataView] = useState(false);
+  const [editView, setEditView] = useState(false);
+  const activeTank = tanks.find((t) => t.id === activeId);
   const dataCount = tanks.reduce(
     (a, t) =>
       a +
@@ -87,6 +105,60 @@ export function SettingsTab({
       { text: "Delete", style: "destructive", onPress: () => activeId && onDeleteTank(activeId) },
     ]);
   };
+
+  const [ef, setEf] = useState({ name: "", type: "Saltwater", volume: "", started: "" });
+  const openEdit = () => {
+    if (!activeTank) return;
+    setEf({
+      name: activeTank.name,
+      type: activeTank.type,
+      volume: String(toDisplayVol(activeTank.volume, units)),
+      started: activeTank.started,
+    });
+    setEditView(true);
+  };
+  const saveEdit = () => {
+    if (!activeTank) return;
+    const vol = Number(ef.volume);
+    onEditTank(activeTank.id, {
+      name: ef.name.trim() || activeTank.name,
+      type: ef.type,
+      volume: vol > 0 ? fromDisplayVol(vol, units) : activeTank.volume,
+      started: /^\d{4}-\d{2}-\d{2}$/.test(ef.started) ? ef.started : activeTank.started,
+    });
+    setEditView(false);
+  };
+
+  const clampHour = (h: number) => Math.max(0, Math.min(23, h));
+
+  if (editView) {
+    return (
+      <View>
+        <ToolHeader title="Tank Details" onBack={() => setEditView(false)} />
+        <Card>
+          <Label>NAME</Label>
+          <Input value={ef.name} onChangeText={(v) => setEf({ ...ef, name: v })} placeholder="Tank name" style={{ marginTop: 8 }} />
+          <Label style={{ marginTop: 14 }}>TYPE</Label>
+          <View style={styles.typeRow}>
+            {["Saltwater", "Freshwater", "Brackish"].map((k) => (
+              <Chip key={k} label={k} active={ef.type === k} onPress={() => setEf({ ...ef, type: k })} />
+            ))}
+          </View>
+          <View style={styles.editRow}>
+            <View style={{ flex: 1 }}>
+              <Label>VOLUME ({volUnit(units)})</Label>
+              <Input value={ef.volume} onChangeText={(v) => setEf({ ...ef, volume: v })} numeric placeholder="Volume" style={{ marginTop: 8 }} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Label>STARTED (YYYY-MM-DD)</Label>
+              <Input value={ef.started} onChangeText={(v) => setEf({ ...ef, started: v })} placeholder="2024-01-31" style={{ marginTop: 8 }} />
+            </View>
+          </View>
+          <Pill label="Save tank" onPress={saveEdit} style={{ marginTop: 16, paddingVertical: 11 }} />
+        </Card>
+      </View>
+    );
+  }
 
   if (dataView) {
     return (
@@ -171,11 +243,49 @@ export function SettingsTab({
           right={<ChevronRight size={18} color={T.sub} />}
         />
         <Row
-          icon={<Waves size={16} color={T.cyan} />}
-          title="Tanks"
-          sub={`${tanks.length} tank${tanks.length > 1 ? "s" : ""} · auto-saved`}
+          icon={<Pencil size={16} color={T.cyan} />}
+          title="Edit current tank"
+          sub={activeTank ? `${activeTank.name} · ${activeTank.type}` : `${tanks.length} tank${tanks.length > 1 ? "s" : ""}`}
+          onPress={openEdit}
+          right={<ChevronRight size={18} color={T.sub} />}
         />
-        <Row icon={<Bell size={16} color={T.cyan} />} title="Notifications" sub="Reminders for time-sensitive tasks" last />
+        <Row
+          icon={<Ruler size={16} color={T.cyan} />}
+          title="Units"
+          sub={units === "metric" ? "Metric (°C · L)" : "Imperial (°F · gal)"}
+          right={
+            <View style={styles.unitChips}>
+              <Chip label="°F" active={units === "imperial"} onPress={() => onSetUnits("imperial")} />
+              <Chip label="°C" active={units === "metric"} onPress={() => onSetUnits("metric")} />
+            </View>
+          }
+        />
+        <Row
+          icon={<Bell size={16} color={T.cyan} />}
+          title="Task reminders"
+          sub={notifEnabled ? "Alerts for time-sensitive tasks" : "Off"}
+          last={!notifEnabled}
+          right={
+            <Switch
+              value={notifEnabled}
+              onValueChange={(v) => onSetNotif(v, reminderHour)}
+              trackColor={{ true: T.cyanDim, false: "#1a3a44" }}
+              thumbColor={notifEnabled ? T.cyan : "#7fa9b3"}
+            />
+          }
+        />
+        {notifEnabled && (
+          <View style={styles.hourRow}>
+            <Text style={styles.hourLabel}>Remind at</Text>
+            <IconButton onPress={() => onSetNotif(true, clampHour(reminderHour - 1))} accessibilityLabel="Earlier" style={styles.hourBtn}>
+              <Minus size={14} color={T.cyan} />
+            </IconButton>
+            <Text style={styles.hourValue}>{String(reminderHour).padStart(2, "0")}:00</Text>
+            <IconButton onPress={() => onSetNotif(true, clampHour(reminderHour + 1))} accessibilityLabel="Later" style={styles.hourBtn}>
+              <Plus size={14} color={T.cyan} />
+            </IconButton>
+          </View>
+        )}
       </Card>
 
       <Pressable onPress={confirmDeleteTank} style={styles.deleteBtn}>
@@ -285,4 +395,11 @@ const styles = StyleSheet.create({
   },
   deleteText: { color: T.danger, fontSize: 14, fontWeight: "600", fontFamily: FONT },
   footer: { textAlign: "center", fontSize: 11, color: T.sub, marginTop: 20, fontFamily: MONO },
+  unitChips: { flexDirection: "row", gap: 6 },
+  hourRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 12 },
+  hourLabel: { flex: 1, fontSize: 13, color: T.sub, fontFamily: FONT },
+  hourBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: T.line },
+  hourValue: { fontSize: 15, fontWeight: "700", color: T.text, fontFamily: MONO, minWidth: 52, textAlign: "center" },
+  typeRow: { flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" },
+  editRow: { flexDirection: "row", gap: 12, marginTop: 14 },
 });

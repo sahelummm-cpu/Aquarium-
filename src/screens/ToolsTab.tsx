@@ -22,6 +22,7 @@ import {
 import { T, FONT, MONO, CYAN_GRAD } from "../theme";
 import { Card, Label, Pill, Chip, Input, Tag, ToolHeader } from "../ui";
 import { Tank, Species, TimerItem, FISH_DB, gradFor, uid } from "../data";
+import { Units, fmtVol, toDisplayVol, volUnit } from "../units";
 
 type ToolView = "menu" | "database" | "dosing" | "wc" | "timers";
 
@@ -41,6 +42,7 @@ export function ToolsTab({
   setCustomFish,
   timers,
   setTimers,
+  units,
 }: {
   tank: Tank;
   updateTank: (id: string, patch: Partial<Tank>) => void;
@@ -50,14 +52,15 @@ export function ToolsTab({
   setCustomFish: (next: Species[]) => void;
   timers: TimerItem[];
   setTimers: React.Dispatch<React.SetStateAction<TimerItem[]>>;
+  units: Units;
 }) {
   const [view, setView] = useState<ToolView>("menu");
   const back = () => setView("menu");
 
   if (view === "database")
     return <Database tank={tank} updateTank={updateTank} customFish={customFish} setCustomFish={setCustomFish} back={back} />;
-  if (view === "dosing") return <DosingCalc tank={tank} back={back} />;
-  if (view === "wc") return <WaterChangeCalc tank={tank} back={back} />;
+  if (view === "dosing") return <DosingCalc tank={tank} units={units} back={back} />;
+  if (view === "wc") return <WaterChangeCalc tank={tank} units={units} back={back} />;
   if (view === "timers") return <Timers timers={timers} setTimers={setTimers} back={back} />;
 
   return (
@@ -259,15 +262,18 @@ function ReqCol({ icon, label, val }: { icon: React.ReactNode; label: string; va
 }
 
 /* ---- Water-change calculator ---- */
-function WaterChangeCalc({ tank, back }: { tank: Tank; back: () => void }) {
+function WaterChangeCalc({ tank, units, back }: { tank: Tank; units: Units; back: () => void }) {
   const [pct, setPct] = useState(25);
-  const gal = (tank.volume * pct) / 100;
+  const gal = (tank.volume * pct) / 100; // canonical gallons to replace
+  const metric = units === "metric";
+  const primary = toDisplayVol(gal, units);
+  const secondary = metric ? gal.toFixed(1) + " gal" : (gal * 3.78541).toFixed(1) + " L";
   return (
     <View>
       <ToolHeader title="Water-Change Calculator" onBack={back} />
       <Card>
         <Label>
-          {tank.name} · {tank.volume} GALLONS
+          {tank.name} · {fmtVol(tank.volume, units).toUpperCase()}
         </Label>
         <Text style={styles.wcHint}>Change percentage</Text>
         <View style={styles.wcChips}>
@@ -287,9 +293,11 @@ function WaterChangeCalc({ tank, back }: { tank: Tank; back: () => void }) {
           thumbTintColor={T.cyan}
         />
         <View style={styles.wcResult}>
-          <Text style={styles.wcBig}>{gal.toFixed(1)}</Text>
-          <Text style={styles.wcSub}>gallons to replace ({pct}%)</Text>
-          <Text style={styles.wcLiters}>≈ {(gal * 3.785).toFixed(1)} liters</Text>
+          <Text style={styles.wcBig}>{primary}</Text>
+          <Text style={styles.wcSub}>
+            {volUnit(units) === "L" ? "liters" : "gallons"} to replace ({pct}%)
+          </Text>
+          <Text style={styles.wcLiters}>≈ {secondary}</Text>
         </View>
       </Card>
       <Text style={styles.tip}>
@@ -306,7 +314,7 @@ const SUPPS: Record<string, { unit: string; factor: number; name: string }> = {
   Magnesium: { unit: "ppm", factor: 0.006, name: "Mg supplement" },
 };
 
-function DosingCalc({ tank, back }: { tank: Tank; back: () => void }) {
+function DosingCalc({ tank, units, back }: { tank: Tank; units: Units; back: () => void }) {
   const [supp, setSupp] = useState("Alkalinity");
   const [cur, setCur] = useState("");
   const [target, setTarget] = useState("");
@@ -332,7 +340,7 @@ function DosingCalc({ tank, back }: { tank: Tank; back: () => void }) {
             <>
               <Text style={styles.dosingBig}>{dose} ml</Text>
               <Text style={styles.wcSub}>
-                of {s.name} for {tank.volume} gal
+                of {s.name} for {fmtVol(tank.volume, units)}
               </Text>
               <Text style={styles.dosingWarn}>Dose gradually — raise no more than 1 {s.unit}/day.</Text>
             </>

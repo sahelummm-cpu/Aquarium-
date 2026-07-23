@@ -18,13 +18,16 @@ import {
   Species,
   CommunityPost,
   TimerItem,
+  ParamPreset,
+  PARAM_PRESETS,
   seedTank,
   emptyTank,
   defaultTimers,
   SEED_COMMUNITY,
 } from "./data";
+import { Units } from "./units";
 import { deletePhoto } from "./photos";
-import { ensureNotificationPermission, cancelReminder } from "./notifications";
+import { ensureNotificationPermission, cancelReminder, cancelAllReminders, scheduleTaskReminder, setNotifPrefs } from "./notifications";
 import { Header } from "./components/Header";
 import { TabBar, TabId } from "./components/TabBar";
 import { Paywall } from "./components/Paywall";
@@ -45,6 +48,11 @@ type PersistShape = {
   adsRemoved: boolean;
   customFish: Species[];
   community: CommunityPost[];
+  units?: Units;
+  customParams?: ParamPreset[];
+  likedPosts?: Record<string, boolean>;
+  notifEnabled?: boolean;
+  reminderHour?: number;
 };
 
 const QUICK_ACTIONS: QuickActions.Action[] = [
@@ -65,7 +73,12 @@ export default function Reeflog() {
   const [adsRemoved, setAdsRemoved] = useState(false);
   const [customFish, setCustomFish] = useState<Species[]>([]);
   const [community, setCommunity] = useState<CommunityPost[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [timers, setTimers] = useState<TimerItem[]>(defaultTimers);
+  const [units, setUnits] = useState<Units>("imperial");
+  const [customParams, setCustomParams] = useState<ParamPreset[]>([]);
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [reminderHour, setReminderHour] = useState(9);
   const [showPaywall, setShowPaywall] = useState(false);
   const [ready, setReady] = useState(false);
   const first = useRef(true);
@@ -82,6 +95,12 @@ export default function Reeflog() {
         setAdsRemoved(!!st.adsRemoved);
         setCustomFish(st.customFish || []);
         setCommunity(st.community || SEED_COMMUNITY);
+        setLikedPosts(st.likedPosts || {});
+        setUnits(st.units || "imperial");
+        setCustomParams(st.customParams || []);
+        setNotifEnabled(st.notifEnabled !== false);
+        setReminderHour(typeof st.reminderHour === "number" ? st.reminderHour : 9);
+        setNotifPrefs({ enabled: st.notifEnabled !== false, hour: typeof st.reminderHour === "number" ? st.reminderHour : 9 });
       } else {
         const t = seedTank();
         setTanks([t]);
@@ -115,7 +134,19 @@ export default function Reeflog() {
       return;
     }
     (async () => {
-      const ok = await saveState({ tanks, activeId, premium, adsRemoved, customFish, community });
+      const ok = await saveState({
+        tanks,
+        activeId,
+        premium,
+        adsRemoved,
+        customFish,
+        community,
+        likedPosts,
+        units,
+        customParams,
+        notifEnabled,
+        reminderHour,
+      });
       if (!ok && !warnedFull.current) {
         warnedFull.current = true;
         Alert.alert(
@@ -124,9 +155,10 @@ export default function Reeflog() {
         );
       }
     })();
-  }, [tanks, activeId, premium, adsRemoved, customFish, community, ready]);
+  }, [tanks, activeId, premium, adsRemoved, customFish, community, likedPosts, units, customParams, notifEnabled, reminderHour, ready]);
 
   const active = tanks.find((t) => t.id === activeId) || tanks[0];
+  const params = [...PARAM_PRESETS, ...customParams];
 
   const updateTank = (id: string, patch: Partial<Tank>) =>
     setTanks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -161,7 +193,35 @@ export default function Reeflog() {
     setAdsRemoved(!!data.adsRemoved);
     setCustomFish(Array.isArray(data.customFish) ? data.customFish : []);
     if (Array.isArray(data.community)) setCommunity(data.community);
+    setLikedPosts(data.likedPosts && typeof data.likedPosts === "object" ? data.likedPosts : {});
+    setUnits(data.units === "metric" ? "metric" : "imperial");
+    setCustomParams(Array.isArray(data.customParams) ? data.customParams : []);
     setTab("home");
+  };
+
+  /* Notification preference changes cancel + reschedule every reminder. */
+  const applyNotifPrefs = async (enabled: boolean, hour: number) => {
+    setNotifEnabled(enabled);
+    setReminderHour(hour);
+    setNotifPrefs({ enabled, hour });
+    await cancelAllReminders();
+    if (enabled) {
+      const updated = await Promise.all(
+        tanks.map(async (t) => ({
+          ...t,
+          tasks: await Promise.all(
+            t.tasks.map(async (task) =>
+              task.priority === "timeSensitive" && !task.done
+                ? { ...task, notifId: await scheduleTaskReminder(task, t.name) }
+                : { ...task, notifId: null }
+            )
+          ),
+        }))
+      );
+      setTanks(updated);
+    } else {
+      setTanks((ts) => ts.map((t) => ({ ...t, tasks: t.tasks.map((task) => ({ ...task, notifId: null })) })));
+    }
   };
 
   if (!ready) {
@@ -182,6 +242,7 @@ export default function Reeflog() {
       <Header
         active={active}
         tanks={tanks}
+        units={units}
         topInset={insets.top}
         onSelect={setActiveId}
         onAddTank={addTank}
@@ -199,10 +260,20 @@ export default function Reeflog() {
           keyboardDismissMode="on-drag"
         >
           {active && tab === "home" && (
-            <HomeTab tank={active} updateTank={updateTank} showAds={showAds} onUpgrade={openPaywall} />
+            <HomeTab tank={active} updateTank={updateTank} showAds={showAds} onUpgrade={openPaywall} units={units} params={params} />
           )}
           {active && tab === "calendar" && <CalendarTab tank={active} updateTank={updateTank} />}
-          {active && tab === "graphs" && <GraphsTab tank={active} updateTank={updateTank} />}
+          {active && tab === "graphs" && (
+            <GraphsTab
+              tank={active}
+              updateTank={updateTank}
+              units={units}
+              customParams={customParams}
+              setCustomParams={setCustomParams}
+              premium={premium}
+              onUpgrade={openPaywall}
+            />
+          )}
           {active && tab === "gallery" && (
             <GalleryTab tank={active} updateTank={updateTank} premium={premium} onUpgrade={openPaywall} onBack={goHome} />
           )}
@@ -216,10 +287,11 @@ export default function Reeflog() {
               setCustomFish={setCustomFish}
               timers={timers}
               setTimers={setTimers}
+              units={units}
             />
           )}
           {active && tab === "community" && (
-            <CommunityTab tank={active} community={community} setCommunity={setCommunity} />
+            <CommunityTab tank={active} community={community} setCommunity={setCommunity} liked={likedPosts} setLiked={setLikedPosts} />
           )}
           {tab === "settings" && (
             <SettingsTab
@@ -228,6 +300,12 @@ export default function Reeflog() {
               onUpgrade={openPaywall}
               tanks={tanks}
               activeId={activeId}
+              units={units}
+              onSetUnits={setUnits}
+              notifEnabled={notifEnabled}
+              reminderHour={reminderHour}
+              onSetNotif={applyNotifPrefs}
+              onEditTank={updateTank}
               onDeleteTank={deleteTank}
               onImport={importData}
               onBack={goHome}
