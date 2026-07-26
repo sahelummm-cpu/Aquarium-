@@ -17,8 +17,9 @@ npm install
 npm start          # start the Expo dev server (press i / a, or scan the QR)
 npm run ios        # open in an iOS simulator (macOS)
 npm run android    # open on an Android emulator / device
-npm run web        # run in the browser via react-native-web
 ```
+
+This is a **native-only** app (iOS & Android) — there is no web build.
 
 Install the **Expo Go** app on your phone and scan the QR code from `npm start`
 to run it on a real device instantly.
